@@ -11,6 +11,7 @@ def model_from_demography(demography):
     # get info per epoch
     dd = demography.debug()
     nepochs = len(dd.epochs)
+    epoch_bounds = [e.start_time for e in dd.epochs]
 
     # determine the states (active deme pairs (i,j) per epoch)
     INACTIVE = msprime.demography.PopulationStateMachine.INACTIVE
@@ -74,6 +75,7 @@ def model_from_demography(demography):
         else:
             # if there are no events, should be the identity matrix
             np.fill_diagonal(epoch_events[e], 1)
+    
     # check epoch_events rows sum to 1
     for e in range(nepochs):
         assert(epoch_events[e].sum(axis=1).sum() == nstates)
@@ -87,25 +89,21 @@ def model_from_demography(demography):
                     # from (k, l) to (m, n) backwards in time
                     k, l = states[i]
                     m, n = states[j]
-                    # assume only one migration occurs per time step
-                    if (m != k) + (n != l) > 1 and (m != l) + (n != k) > 1:
-                        Q[e,i,j] = 0
-                    else:
-                        # go through the cases
-                        if k == m and l != n:       # l moves to n
-                            Q[e, i, j] = (2**int(k==l))*migration_rates[e, l, n]
-                        elif l == n and k != m:     # k moves to m
-                            Q[e, i, j] = (2**int(k==l))*migration_rates[e, k, m]
-                        elif k == n and l != m:     # l moves to m
-                            Q[e, i, j] = (2**int(k==l))*migration_rates[e, l, m]
-                        elif l == m and k != n:     # k moves to n
-                            Q[e, i, j] = (2**int(k==l))*migration_rates[e, k, n]
-                        else:
-                            Q[e, i, j] = 0
+                    # go through the cases
+                    if k == m and l != n:       # l moves to n
+                        Q[e, i, j] = (2**int(k==l))*migration_rates[e, l, n]
+                    elif l == n and k != m:     # k moves to m
+                        Q[e, i, j] = (2**int(k==l))*migration_rates[e, k, m]
+                    elif k == n and l != m:     # l moves to m
+                        Q[e, i, j] = (2**int(k==l))*migration_rates[e, l, m]
+                    elif l == m and k != n:     # k moves to n
+                        Q[e, i, j] = (2**int(k==l))*migration_rates[e, k, n]
+                    else: # assume only one migration occurs per time step, otherwise transition rate is 0
+                        Q[e, i, j] = 0
         # fill in coalescence rates
         Q[e,nstates, nstates] = 0 # coal -> coal = 0
         Q[e,:nstates,nstates] = coal_rates[e]
         # set diagonals so rows sum to zero
         np.fill_diagonal(Q[e], -Q[e].sum(axis=1))
 
-    return Q, epoch_events, states, state_index
+    return Q, epoch_events, epoch_bounds, state_index, pop_index, 2*Nancestral
