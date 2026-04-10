@@ -52,7 +52,7 @@ def model_from_demography(demography):
     def move_lineage_admx(source, dest, alpha, v):
         return [(dest, alpha), (v, 1 - alpha)] if v == source else [(v, 1.0)]
     for e, epoch in enumerate(dd.epochs):
-        events = [event for event in epoch.events if event==ADMIXTURE or event==POPSPLIT]
+        events = [event for event in epoch.events if isinstance(event,ADMIXTURE) or isinstance(event,POPSPLIT)]
         if len(events) > 0:
             for event in events:
                 if isinstance(event,ADMIXTURE):
