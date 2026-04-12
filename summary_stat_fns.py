@@ -8,7 +8,7 @@ import tskit
 # Get the ALD from the simulated data
 
 # Get the pairwise coalescence times from the simulated data
-def pair_coalescence_counts(ts, window_size=10000, nintervals=256, min_time=np.exp(3), max_time=np.exp(14)):
+def pair_coalescence_counts(ts, window_size=10000, nintervals=256, min_time=np.exp(3), max_time=np.exp(14), time_scale="linear"):
     """
     Each tree sequence represents the genealogy of a non-recombining unit.
     To obtain a good estimate of the number of pairwise coalescence events occurring within a time interval, we want to sample multiple trees.
@@ -20,9 +20,18 @@ def pair_coalescence_counts(ts, window_size=10000, nintervals=256, min_time=np.e
     Therefore, windows should be approx. the size of the distance one would use for independent sampling (~10-100kb)!
     Normalizing by tree span then represents the expected number of coalescence events in a given time interval if sampling one tree from that window!
     """
+    # Check inputs
+    # TO DO: make this an enum?
+    if time_scale not in ["log", "linear"]:
+        print("invalid time-scale, using linear")
+        time_scale = "linear"
+
     # Get the time intervals (equally spaced on a log scale)
     min_time = min_time if min_time > 0 else 1
-    time_windows = np.exp(np.linspace(np.log(min_time), np.log(max_time), nintervals)) 
+    if time_scale == "log":
+        time_windows = np.exp(np.linspace(np.log(min_time), np.log(max_time), nintervals)) 
+    else:
+        time_windows = np.linspace(min_time, max_time, nintervals)
 
     # Get the sample sets
     name2id = {p.metadata["name"]:p.id for p in ts.populations()}

@@ -9,15 +9,22 @@ from scipy.linalg import expm
 
 # Compute PMF of pairwise coalescence times given a model (mrpast reimplementation)
 ## Ignore growth rates for now, TO DO: can add in later
-def pair_coal_times_PMF(demography, nintervals=256, min_time=np.exp(3), max_time=np.exp(14)):
+def pair_coal_times_PMF(demography, nintervals=256, min_time=np.exp(3), max_time=np.exp(14), time_scale="linear"):
     # get the model from the demogrpahy object
     Q, E, epoch_bounds, state_index, pop_index, scale_factor = model_from_demography(demography)
     S = len(state_index) + 1
 
+    # check parameters
+    if time_scale not in ["log", "linear"]:
+        print("invalid time-scale, using linear")
+        time_scale = "linear"
+
     # create the time discretization
     min_time = min_time if min_time > 0 else 1
-    # TO DO: option for log scale or linear spaced time windows
-    time_windows = np.exp(np.linspace(np.log(min_time), np.log(max_time), nintervals)) # not scaled
+    if time_scale == "log":
+        time_windows = np.exp(np.linspace(np.log(min_time), np.log(max_time), nintervals)) # not scaled
+    else:
+        time_windows = np.linspace(min_time, max_time, nintervals)
     time_windows = time_windows / scale_factor # scale by scale_factor = 2*Nancestral
     epoch_bounds = np.array(epoch_bounds) / scale_factor
 
@@ -31,9 +38,11 @@ def pair_coal_times_PMF(demography, nintervals=256, min_time=np.exp(3), max_time
         is_epoch_bound[i] = flag
     epoch_bounds_discrete = time_windows[is_epoch_bound]
     # ensure epoch bounds always start at 0
-    # TO DO: make this more robust later!
+    # TO DO: make this more robust later! 
+    # INCLUDING DECREASING EPOCHS IN THE MODEL AND PROCEEDING WITH CALCULATION IN PLACE OF ASSERTION ERROR
     if epoch_bounds_discrete[0] != 0: 
         epoch_bounds_discrete = np.insert(epoch_bounds_discrete,0,0)
+    assert(len(epoch_bounds_discrete) == len(epoch_bounds)), "The time discretization is not fine-grained enough to retain all epochs"
 
     # helper function to normalize rows of a matrix
     def rowNorm(X):
