@@ -77,6 +77,10 @@ def main(args):
             grouped[result["model"]].extend(result["counts"])
 
     # grouped is a dictionary mapping each model to a list of TOTAL_REPS counts arrays
+    if args.save_all:
+        print("Saving all results")
+        with open(args.out_prefix+'_grouped.pkl', "wb") as f:
+            pickle.dump(grouped, f)
 
     print("Summarizing")
     # for each model, calculate summary statitistics (means and 95% CIs)
@@ -89,9 +93,9 @@ def main(args):
         
         summary[model_name] = {"mean": mean, "lower": lower, "upper": upper}
 
-    print("Saving")
+    print("Saving summary")
     # save the results
-    with open(args.outfile, "wb") as f:
+    with open(args.out_prefix+'_summary.pkl', "wb") as f:
         pickle.dump(summary, f)
 
 if __name__ == '__main__':
@@ -104,7 +108,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=25) 
     parser.add_argument('--nworkers', type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--outfile', type=str, default="simulations_1.pkl") 
+    parser.add_argument('--save_all', action="store_true")
+    parser.add_argument('--out_prefix', type=str, default="simulations_1") 
     args = parser.parse_args()
 
     main(args)

@@ -6,6 +6,52 @@ from scipy.linalg import expm
 # Functions for comparing the distances/resolvability between distributions of summary statistics from different models
 
 # Compute likelihood of pairwise coalescence counts given a demographic model
+def pair_coal_times_loglik(counts, pmf, time_scale="linear", epsilon=1e-9):
+    # returns \sum_k (pmf_k * log(counts_k))
+
+    # handle case where the counts and pmf are not the same length
+    ncounts = len(counts) if counts.ndim == 1 else counts.shape[-1]
+    if len(pmf) > ncounts:
+        if time_scale=="linear":
+            step = len(pmf) // ncounts
+            indices = np.arange(0, len(pmf), step)
+            pmf = np.add.reduceat(pmf, indices)
+            pmf = pmf[:ncounts]
+        # TO DO: handle different sized time intervals on the log scale (NOT linear)
+    # TO DO: fix this depending on dimensions of counts
+    elif len(pmf) < len(counts): 
+        if time_scale=="linear":
+            step = len(counts) // len(pmf)
+            indices = np.arange(0, len(counts), step)
+            counts = np.add.reduceat(counts, indices)
+        # TO DO: handle different sized time intervals on the log scale (NOT linear)
+
+    # return the log likelihood
+    if counts.ndim > 1:
+        return (np.log(counts+epsilon) * pmf).sum(axis=1)
+    else:
+        return (np.log(counts+epsilon) * pmf).sum()
+
+def LR(null_pmf, alt_pmf, null_counts, alt_counts, seed=42, alpha=0.05):
+    """
+    The likelihood ratio compares L(obs|alt) / L(obs|null)
+
+    To get a null distribution of LR: L(null_counts | alt_pmf) / L(null_counts | null_pmf)
+
+    To get the distribution of LR: L(alt_counts | alt_pmf) / L(alt_counts | null_pmf)
+
+    """
+    ll0_null = pair_coal_times_loglik(null_counts, null_pmf)
+    lla_null = pair_coal_times_loglik(null_counts, alt_pmf)
+    lr_null = 2*(lla_null - ll0_null)
+    threshold = np.quantile(lr_null, 1-alpha)
+
+    ll0_alt = pair_coal_times_loglik(alt_counts, null_pmf)
+    lla_alt = pair_coal_times_loglik(alt_counts, alt_pmf)
+    lr_alt = 2*(lla_alt - ll0_alt)
+    power = (lr_alt > threshold).sum() / len(lr_alt)
+
+    return lr_null, lr_alt, threshold, power
 
 # Compute PMF of pairwise coalescence times given a model (mrpast reimplementation)
 ## Ignore growth rates for now, TO DO: can add in later
