@@ -5,9 +5,18 @@ from scipy.linalg import expm
 
 # Functions for comparing the distances/resolvability between distributions of summary statistics from different models
 
+# Estimate Hellinger distance between two discretized pdfs
+def pair_coal_times_H2(P,Q):
+    return np.square(np.sqrt(P) - np.sqrt(Q)).sum() / 2
+
+# Estimate the TVD between two discretized pdfs
+def pair_coal_times_TVD(P, Q):
+    # P and Q should be two pdfs with the SAME time interval discretization!
+    return np.abs(P-Q).sum() / 2
+
 # Compute likelihood of pairwise coalescence counts given a demographic model
-def pair_coal_times_loglik(counts, pmf, time_scale="linear", epsilon=1e-9):
-    # returns \sum_k (pmf_k * log(counts_k))
+def pair_coal_times_loglik(counts, pmf, time_scale="linear", epsilon=1e-9, total_counts=None):
+    # returns \sum_k (log(pmf_k) * counts_k)
 
     # handle case where the counts and pmf are not the same length
     ncounts = len(counts) if counts.ndim == 1 else counts.shape[-1]
@@ -26,13 +35,28 @@ def pair_coal_times_loglik(counts, pmf, time_scale="linear", epsilon=1e-9):
             counts = np.add.reduceat(counts, indices)
         # TO DO: handle different sized time intervals on the log scale (NOT linear)
 
+    # downsample counts to the desired total
+    if total_counts is not None:
+        sampled_counts = np.zeros_like(counts)
+        weights = counts / counts.sum(axis=1, keepdims=True)
+        if counts.ndim > 1:
+            for rep in range(counts.shape[0]):
+                for _ in range(total_counts):
+                    i = np.random.choice(np.arange(counts.shape[1]), size=1, p=weights[rep])
+                    sampled_counts[rep,i] += 1
+        else:
+            for _ in range(total_counts):
+                i = np.random.choice(np.arange(len(counts)), size=1, p=weights)
+                sampled_counts[i] += 1
+        counts = sampled_counts
+
     # return the log likelihood
     if counts.ndim > 1:
-        return (np.log(counts+epsilon) * pmf).sum(axis=1)
+        return (np.log(pmf) * counts).sum(axis=1)
     else:
-        return (np.log(counts+epsilon) * pmf).sum()
+        return (np.log(pmf) * counts).sum()
 
-def LR(null_pmf, alt_pmf, null_counts, alt_counts, seed=42, alpha=0.05):
+def LR(null_pmf, alt_pmf, null_counts, alt_counts, seed=42, alpha=0.05, total_counts=None):
     """
     The likelihood ratio compares L(obs|alt) / L(obs|null)
 
@@ -41,15 +65,15 @@ def LR(null_pmf, alt_pmf, null_counts, alt_counts, seed=42, alpha=0.05):
     To get the distribution of LR: L(alt_counts | alt_pmf) / L(alt_counts | null_pmf)
 
     """
-    ll0_null = pair_coal_times_loglik(null_counts, null_pmf)
-    lla_null = pair_coal_times_loglik(null_counts, alt_pmf)
+    ll0_null = pair_coal_times_loglik(null_counts, null_pmf, total_counts=total_counts)
+    lla_null = pair_coal_times_loglik(null_counts, alt_pmf, total_counts=total_counts)
     lr_null = 2*(lla_null - ll0_null)
     threshold = np.quantile(lr_null, 1-alpha)
 
-    ll0_alt = pair_coal_times_loglik(alt_counts, null_pmf)
-    lla_alt = pair_coal_times_loglik(alt_counts, alt_pmf)
+    ll0_alt = pair_coal_times_loglik(alt_counts, null_pmf, total_counts=total_counts)
+    lla_alt = pair_coal_times_loglik(alt_counts, alt_pmf, total_counts=total_counts)
     lr_alt = 2*(lla_alt - ll0_alt)
-    power = (lr_alt > threshold).sum() / len(lr_alt)
+    power = (lr_alt >= threshold).sum() / len(lr_alt)
 
     return lr_null, lr_alt, threshold, power
 
