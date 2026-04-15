@@ -15,13 +15,14 @@ def pair_coal_times_TVD(P, Q):
     return np.abs(P-Q).sum() / 2
 
 # Compute likelihood of pairwise coalescence counts given a demographic model
-def pair_coal_times_loglik(counts, pmf, time_scale="linear", epsilon=1e-9, total_counts=None):
+def pair_coal_times_loglik(counts, pmf, time_scale="linear", total_counts=None):
     # returns \sum_k (log(pmf_k) * counts_k)
 
     # handle case where the counts and pmf are not the same length
     ncounts = len(counts) if counts.ndim == 1 else counts.shape[-1]
     if len(pmf) > ncounts:
         if time_scale=="linear":
+            # TO DO: make this more robust/handle when counts length is not a multiple of pmf length
             step = len(pmf) // ncounts
             indices = np.arange(0, len(pmf), step)
             pmf = np.add.reduceat(pmf, indices)
