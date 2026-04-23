@@ -7,6 +7,74 @@ import tskit
 
 # Get the ALD from the simulated data
 
+# Helper function to sample trees spaced some distance apart in a tree sequence
+def get_trees(ts, start_pos, inter_tree_dist, num_trees):
+    # Returns a generator that is memory efficient because it doesn't require loading every tree at once in memory
+    pos = start_pos
+    nt = 0
+    while pos < ts.sequence_length and nt < num_trees:
+        tree = ts.at(pos)
+        yield nt, tree
+        pos += inter_tree_dist
+        nt += 1
+
+# More preceise control over sampling pairwise coalescence times
+def sample_pair_coalescence_counts(ts, pops, inter_tree_dist, pairs_per_tree, n_sets, seed, nintervals=256, min_time=1, max_time=80_000):
+    # Sampling will vary the number of trees sampled in order to compare power across different sample sizes
+    max_trees = ts.sequence_length // inter_tree_dist
+    num_trees = np.arange(0, max_trees, max_trees // 10, dtype=np.int32)
+    num_trees[0] += 1
+
+    # get rng for sampling
+    rng = np.random.default_rng(seed=seed)
+
+    # get the nodes in the pops to sample from
+    namemap = {p.metadata['name']:p.id for p in ts.populations()}
+    pop_membership = {p:[ts.node(n).id for n in range(ts.num_nodes) if ts.node(n).population==namemap[p] and ts.node(n).time==0] for p in pops}
+
+    # sample
+    all_times = []
+    for nt in num_trees:
+        times = np.zeros((n_sets, nt, pairs_per_tree))
+        for s in range(n_sets):
+            start_pos = rng.integers(inter_tree_dist)
+            for t, tree in get_trees(ts, start_pos, inter_tree_dist, nt):
+                # sample pairs from the tree
+                for k in range(pairs_per_tree):
+                    # sample pair
+                    if len(pops) > 1:
+                        assert len(pops)==2
+                        n1 = rng.choice(pop_membership[pops[0]])
+                        n2 = rng.choice(pop_membership[pops[1]])
+                        tmrca = tree.tmrca(n1,n2)
+                    else:
+                        nodes = rng.choice(pop_membership[pops[0]], size=2, replace=False)
+                        tmrca = tree.tmrca(nodes[0],nodes[1])
+                    times[s, t, k] = tmrca
+        times = times.reshape(n_sets, -1) # reshape to combine number of trees/number of pairs axes
+        all_times.append(times)
+
+    # perform binning - will make each array in all_times the same size
+    min_time = min_time if min_time > 0 else 1
+    time_bins = np.linspace(min_time, max_time, nintervals)
+    counts = np.array([np.array([np.histogram(row, bins=time_bins)[0] for row in times]) for times in all_times]) # (10, n_sets, len(time_bins)-1)
+
+    # if performance becomes an issue use a np.searchsorted approach instead
+    """
+    (from Claude)
+    indices = np.searchsorted(time_bins, times, side='right') - 1  # shape: same as times
+    n_bins = len(time_bins) - 1
+    n_rows = times.shape[0]
+
+    counts = np.zeros((n_rows, n_bins), dtype=int)
+    valid = (indices >= 0) & (indices < n_bins)
+
+    rows = np.where(valid, np.arange(n_rows)[:, None], 0)  # broadcast row indices
+    np.add.at(counts, (rows[valid], indices[valid]), 1)
+    """
+
+    return counts
+
 # Get the pairwise coalescence times from the simulated data
 def pair_coalescence_counts(ts, window_size=10000, nintervals=256, min_time=np.exp(3), max_time=np.exp(14), time_scale="linear"):
     """

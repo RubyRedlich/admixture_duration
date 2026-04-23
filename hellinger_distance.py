@@ -52,7 +52,7 @@ def print_output(bayes_error, bayes_error_upperbound, TVD_bounds):
 
 # Plotting function from Claude
 def plot_bayes_error(n_values, empirical, bayes_upper, tvd_lower, tvd_upper,
-                     figsize=(8, 5), title="Bayes Error and Bounds vs. Number of Samples"):
+                     figsize=(8, 5), title="Bayes Error and Bounds vs. Number of Samples", ax=None):
     """
     Plot empirical Bayes error alongside upper bound and TVD-based bounds.
  
@@ -68,7 +68,10 @@ def plot_bayes_error(n_values, empirical, bayes_upper, tvd_lower, tvd_upper,
     # LOWER BOUND TVD_LOWER AT 0
     tvd_lower[tvd_lower < 0] = 0
 
-    fig, ax = plt.subplots(figsize=figsize)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
  
     # --- shaded TVD band ---
     ax.fill_between(n_values, tvd_lower, tvd_upper,
