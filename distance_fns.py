@@ -37,6 +37,7 @@ def pair_coal_times_loglik(counts, pmf, time_scale="linear", total_counts=None):
         # TO DO: handle different sized time intervals on the log scale (NOT linear)
 
     # downsample counts to the desired total
+    # SLOW/not used right now
     if total_counts is not None:
         sampled_counts = np.zeros_like(counts)
         weights = counts / counts.sum(axis=1, keepdims=True)

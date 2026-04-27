@@ -23,7 +23,7 @@ def worker(params):
         )
         counts = sample_pair_coalescence_counts(
             ts, 
-            "N1", # sample pairs from N1 
+            ["pop1"], # sample pairs from pop1 
             inter_tree_dist, 
             pairs_per_tree, 
             n_sets, 
@@ -87,22 +87,6 @@ def main(args):
     print("Saving all results")
     with open(args.out_prefix+'_grouped.pkl', "wb") as f:
         pickle.dump(grouped, f)
-
-    # print("Summarizing")
-    # # for each model, calculate summary statitistics (means and 95% CIs)
-    # summary = {}
-    # for model_name, counts_list in grouped.items():
-    #     arr = np.stack(counts_list)  # shape: (TOTAL_REPS, n_states, n_intervals)
-    #     mean  = arr.mean(axis=0)                    # (n_states, n_intervals)
-    #     lower = np.percentile(arr, 2.5,  axis=0)   # (n_states, n_intervals)
-    #     upper = np.percentile(arr, 97.5, axis=0)   # (n_states, n_intervals)
-        
-    #     summary[model_name] = {"mean": mean, "lower": lower, "upper": upper}
-
-    # print("Saving summary")
-    # # save the results
-    # with open(args.out_prefix+'_summary.pkl', "wb") as f:
-    #     pickle.dump(summary, f)
 
 if __name__ == '__main__':
     # Parse arguments
