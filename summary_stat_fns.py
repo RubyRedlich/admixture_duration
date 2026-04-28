@@ -22,9 +22,10 @@ def get_trees(ts, start_pos, inter_tree_dist, num_trees):
 def sample_pair_coalescence_counts(ts, pops, inter_tree_dist, pairs_per_tree, n_sets, seed, nintervals=256, min_time=1, max_time=80_000):
     # Sampling will vary the number of trees sampled in order to compare power across different sample sizes
     max_trees = ts.sequence_length // inter_tree_dist
-    num_trees = np.arange(0, max_trees, max_trees // 10, dtype=np.int32)
-    num_trees[0] += 1
-
+    # num_trees = np.arange(0, max_trees, max_trees // 10, dtype=np.int32)
+    # num_trees[0] += 1
+    num_trees = np.array([250, 1000, 1750, 2250], dtype=np.int32)
+    
     # get rng for sampling
     rng = np.random.default_rng(seed=seed)
 
