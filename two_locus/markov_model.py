@@ -316,4 +316,74 @@ class TwoLocusMarkovModel:
         off_diag = joint_pdf.sum(axis=1) - diag
         pdf = diag * dt + off_diag * dt**2
         return pdf
+    
+    def KLdivergence(null, alt, time_bins, ind_joint=True):
+        # P log(P/Q)
+        def KL(null, alt):
+                ratio = np.divide(null, alt, where=alt!=0, out=np.zeros_like(null))
+                logratio = np.log(ratio, where=ratio!=0, out=np.zeros_like(ratio))
+                D = null * logratio
+                return D.sum()
+        # Assume equally spaced time bins 
+        dt = time_bins[1] - time_bins[0]
+        if np.ndim(null) < 2:
+            if ind_joint:
+                # The single locus PDFs are calculated by taking the difference between successive bins in the CDF
+                # don't need to multiply by dt (already accounted for in each bin)
+                # KL divergence between 2 marginal (single locus) distributions is NOT comparable to the KL divergence between two joint distributions
+                # Instead compare to the naive joint where the two loci are assumed independent
+                # The diagonal has a different interpretation - so ignore the diagonal!
+                f0x, f0y = np.meshgrid(null, null, indexing="ij")
+                f1x, f1y = np.meshgrid(alt, alt, indexing="ij")
+                null = f0x*f0y
+                alt = f1x*f1y
+                np.fill_diagonal(null, 0)
+                np.fill_diagonal(alt, 0)
+            # Do not need to condition on T1!=T2 because the joint PDF when assuming both are independent should have zero density on the diagonal
+            # Still normalize to sum to 1 so that small fluctuations in sum due to discretization approx. do not have large impacts on the KL divergence
+            null_total = null.sum()
+            null = null / null_total if null_total > 0 else null
+            alt_total = alt.sum()
+            alt = alt / alt_total if alt_total > 0 else alt
+            D = KL(null,alt)
+        else:
+            # apply 1D measure to diagonal and 2D measure to off-diagonal
+            grid = np.full(null.shape, dt*dt)
+            np.fill_diagonal(grid, dt) 
+            null = null * grid
+            alt = alt * grid
+            # Calculate KL for T1=T2
+            null_eq = np.diag(null).copy()
+            alt_eq = np.diag(alt).copy()
+            # get P(T1=T2) and Q(T1=T2) and normalize to obtain conditional distributions
+            alpha0 = null_eq.sum() 
+            alpha1 = alt_eq.sum()
+            null_eq = null_eq / alpha0 if alpha0 > 0 else null_eq
+            alt_eq = alt_eq / alpha1 if alpha1 > 0 else alt_eq
+            KL_eq = KL(null_eq, alt_eq) * 2 # multiply by 2 since KL(p(x1)p(x2) || q(x1)q(x2)) = 2 KL(p(x1)||q(x2)) for iid xi
+            # Calculate KL for T1!=T2
+            null_neq = null.copy()
+            np.fill_diagonal(null_neq, 0)
+            alt_neq = alt.copy()
+            np.fill_diagonal(alt_neq, 0)
+            # get P(T1!=T2) and Q(T1!=T2) and normalize to obtain conditional distributions
+            beta0 = null_neq.sum()
+            beta1 = alt_neq.sum()
+            null_neq = null_neq / beta0 if beta0 > 0 else null_neq
+            alt_neq = alt_neq / beta1 if beta1 > 0 else alt_neq
+            KL_neq = KL(null_neq, alt_neq)
+            # Combine 
+            if alpha1 == 0:
+                if alpha0 == 0:
+                    D = beta0*KL_neq + beta0*np.log(beta0/beta1)
+                else:
+                    D = -np.inf
+            elif beta1 == 0:
+                if beta0 == 0:
+                    D = alpha0*KL_eq + alpha0*np.log(alpha0/alpha1)
+                else:
+                    D = -np.inf
+            else:
+                D = alpha0*KL_eq + beta0*KL_neq + (alpha0*np.log(alpha0/alpha1) + beta0*np.log(beta0/beta1))
+        return D
 
