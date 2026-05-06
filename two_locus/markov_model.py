@@ -290,15 +290,30 @@ class TwoLocusMarkovModel:
         CL = np.array([key for key,(hap, pop) in self.states.items() if self.inverse_two_locus_states[hap] in {4}]) - 1
         CR = np.array([key for key,(hap, pop) in self.states.items() if self.inverse_two_locus_states[hap] in {5}]) - 1
 
-        # Compute the discretized PDF
+        # Compute the discretized PDF (faster?)
+        # Case 1: j > i
         for i in range(nintervals):
-            for j in range(nintervals):
-                if i > j:
-                    pdf[i,j] = (P[j, s0, Rplus] @ self.Q[Rplus][:,CR] @ P[i-j,CR][:,CR] @ self.Q[CR][:,CB]).sum()
-                elif i < j:
-                    pdf[i,j] = (P[i, s0, Rplus] @ self.Q[Rplus][:,CL] @ P[j-i,CL][:,CL] @ self.Q[CL][:,CB]).sum()
-                else:
-                    pdf[i,j] = (P[i, s0, R0] @ self.Q[R0][:,CB]).sum()
+            LL = P[i, s0, Rplus] @ self.Q[Rplus][:,CL]
+            for j in range(i+1, nintervals):
+                pdf[i,j] = (LL @ P[j-i,CL][:,CL] @ self.Q[CL][:,CB]).sum()
+        # Case 2: i > j
+        for j in range(nintervals):
+            LR = P[j, s0, Rplus] @ self.Q[Rplus][:,CR]
+            for i in range(j+1, nintervals):
+                pdf[i,j] = (LR @ P[i-j,CR][:,CR] @ self.Q[CR][:,CB]).sum()
+        # Case 3: i = j
+        for i in range(nintervals):
+            pdf[i,i] = (P[i, s0, R0] @ self.Q[R0][:,CB]).sum()
+
+        # # Compute the discretized PDF
+        # for i in range(nintervals):
+        #     for j in range(nintervals):
+        #         if i > j:
+        #             pdf[i,j] = (P[j, s0, Rplus] @ self.Q[Rplus][:,CR] @ P[i-j,CR][:,CR] @ self.Q[CR][:,CB]).sum()
+        #         elif i < j:
+        #             pdf[i,j] = (P[i, s0, Rplus] @ self.Q[Rplus][:,CL] @ P[j-i,CL][:,CL] @ self.Q[CL][:,CB]).sum()
+        #         else:
+        #             pdf[i,j] = (P[i, s0, R0] @ self.Q[R0][:,CB]).sum()
 
         # Plot if desired
         if show_plot: 
